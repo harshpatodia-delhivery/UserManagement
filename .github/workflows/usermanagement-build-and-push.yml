@@ -1,0 +1,51 @@
+name: Build and publish Dockerfile
+
+on:
+  push:
+    branches:
+      - "master"
+      - "development"
+    paths:
+      - 'participants_new/**'
+
+env:
+  PROJECT: "usermanagement"
+  MAJOR_VERSION: "0"
+  MINOR_VERSION: ${{ github.run_number }}
+  DOCKERFILE_PATH: "Dockerfile"
+
+jobs:
+
+  setup-build-publish-deploy:
+
+    name: Setup, Build, Publish, and Deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - uses: GoogleCloudPlatform/github-actions/setup-gcloud@master
+        with:
+          service_account_email: ${{ secrets.F_DOCKER_REGISTRY_UNAME }}
+          service_account_key: ${{ secrets.F_DOCKER_REGISTRY_PWD }}
+
+      - run: |
+          gcloud auth configure-docker
+      - name: Build
+        run: |
+          IMAGE_PATH=${{ secrets.F_DOCKER_REGISTRY_URL }}""$PROJECT
+          VERSION="$MAJOR_VERSION.$MINOR_VERSION"
+          docker build\
+             --build-arg F_REGISTRY=${{ secrets.F_DOCKER_REGISTRY_URL}}\
+             --build-arg F_GITHUB_ACTOR=${{ secrets.F_GITHUB_ACTOR}}\
+             --build-arg F_GITHUB_TOKEN=${{ secrets.F_GITHUB_TOKEN}}\
+             -t $IMAGE_PATH:develop\
+             -t $IMAGE_PATH:${{ github.sha }}\
+             -t $IMAGE_PATH:$VERSION\
+             . -f $DOCKERFILE_PATH
+      - name: Publish
+        run: |
+          IMAGE_PATH=${{ secrets.F_DOCKER_REGISTRY_URL }}""$PROJECT
+          docker push $IMAGE_PATH:develop
+
+          
